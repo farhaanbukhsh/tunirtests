@@ -67,7 +67,13 @@ class TunirNonGatingtestsCpio(unittest.TestCase):
 class TunirNonGatingtestDiffutills(unittest.TestCase):
 
     def setUp(self):
+        """Checking if packages are there"""
         out, err, eid = system('cmp -v &>/dev/null')
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        out, err, eid = system('diff -v &>/dev/null')
         out = out.decode('utf-8')
         err = err.decode('utf-8')
         self.assertEqual(eid, 0, out+err)
@@ -132,8 +138,199 @@ class TunirNonGatingtestDiffutills(unittest.TestCase):
         err = err.decode('utf-8')
         self.assertEqual(eid, 0, out+err)
 
+    def test_diff(self):
+        """Test for diff command"""
+        f1 = '/var/tmp/testf1.txt'
+        f2 = '/var/tmp/testf2.txt'
+        rand_str = 'Here lyeth  muche rychnesse  in lytell space.   -- John Heywood'
+
+        temp_file = open(f1, 'w')
+        temp_file.write(rand_str)
+        temp_file.close()
+
+        temp_file = open(f2, 'w')
+        temp_file.write(rand_str)
+        temp_file.close()
+
+        # Baseline check to ensure diff sees the files are the same.
+        out, err, eid = system('diff %s %s &>/dev/null' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        # Convert a <space> to <space><tab> in F2 then check that diff sees the change
+        # eid is 1 because files are different
+        temp_file = open(f2, 'w')
+        temp_file.write(rand_str.replace(' ', ' \t'))
+        temp_file.close()
+
+        out, err, eid = system('diff %s %s &>/dev/null' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 1, out+err)
+
+        # Convert the first space in $F1 to 4 spaces and check that -E and
+        # --ignore-tab-expansion works and sees no difference between the
+        # two files.
+        temp_file = open(f1, 'w')
+        temp_file.write('        '+rand_str)
+        temp_file.close()
+
+        temp_file = open(f2, 'w')
+        temp_file.write('\t'+rand_str)
+        temp_file.close()
+
+        out, err, eid = system('diff -E %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        out, err, eid = system('diff --ignore-tab-expansion %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        # reduce the 4 spaces to 3 and check diff -E sees a difference
+        temp_file = open(f1, 'w')
+        temp_file.write('   '+rand_str)
+        temp_file.close()
+
+        out, err, eid = system('diff -E %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 1, out+err)
+
+        # Check -b --ignore-space-change add some spaces to the end of the line
+        # to make sure.
+        temp_file = open(f1, 'w')
+        temp_file.write(rand_str + ' ')
+        temp_file.close()
+
+        temp_file = open(f2, 'w')
+        temp_file.write(rand_str)
+        temp_file.close()
+
+        out, err, eid = system('diff -b %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        out, err, eid = system('diff --ignore-space-change %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        # The -b option ignotes difference in whitespace where it already exists.
+        # Check that whitespace added in $F1 where non exists in $F2 is caught by
+        # -b
+        temp_file = open(f1, 'w')
+        temp_file.write(rand_str.replace('ss', 's s'))
+        temp_file.close()
+
+        out, err, eid = system('diff -b %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 1, out+err)
+
+        # Check -w --ignore-all-space
+        out, err, eid = system('diff -w %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        out, err, eid = system('diff --ignore-all-space %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        # Check -B --ignore blank lines, create some new files to work with first.
+        temp_file = open(f1, 'w')
+        temp_file.write(rand_str+'\n'+rand_str)
+        temp_file.close()
+
+        temp_file = open(f2, 'w')
+        temp_file.write(rand_str+'\n'+''+'\n'+rand_str)
+        temp_file.close()
+
+        out, err, eid = system('diff %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 1, out+err)
+
+        out, err, eid = system('diff -B %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(0, eid, out+err)
+
+        out, err, eid = system('diff --ignore-blank-lines %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(0, eid, out+err)
+
+        # Check -i --ignore-case, first ensure that diff sees a difference in case,
+        # as we're using the files from the earlier test we need to use the -B option
+        # too.
+        temp_file = open(f1, 'r')
+        replace_str = ''.join(temp_file.readlines()).replace('l', 'L')
+        temp_file.close()
+        temp_file = open(f1, 'w')
+        temp_file.write(replace_str)
+        temp_file.close()
+
+        out, err, eid = system('diff -B %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 1, out+err)
+
+        # Check that -i causes  diff to ignore the difference in case.
+        out, err, eid = system('diff -B -i %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        out, err, eid = system('diff -B --ignore-case %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        # Check -I --ignore-matching-lines=regexp
+        temp_file = open(f1, 'w')
+        temp_file.write(rand_str+'\n'+'1'+rand_str+'1'+'\n')
+        temp_file.close()
+
+        temp_file = open(f2, 'w')
+        temp_file.write('1'+rand_str+'\n'+rand_str+'\n')
+        temp_file.close()
+
+        out, err, eid = system('diff %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 1, out+err)
+
+        out, err, eid = system("diff -I '^[[:digit:]]' %s %s" % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        out, err, eid = system("diff --ignore-matching-lines='^[[:digit:]]' %s %s" % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertEqual(eid, 0, out+err)
+
+        # Check -q --brief
+        out, err, eid = system('diff -q %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertIn("Files /var/tmp/testf1.txt and /var/tmp/testf2.txt differ", out, out+err)
+
+        out, err, eid = system('diff --brief %s %s' % (f1, f2))
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+        self.assertIn("Files /var/tmp/testf1.txt and /var/tmp/testf2.txt differ", out, out+err)
+
     def tearDown(self):
         system('rm %s %s' % ('/var/tmp/diffutilsa', '/var/tmp/diffutilsa'))
+        system('rm %s %s' % ('/var/tmp/testf1.txt', '/var/tmp/testf2.txt'))
 
 
 class TunirNonGatingtestBzip2(unittest.TestCase):
